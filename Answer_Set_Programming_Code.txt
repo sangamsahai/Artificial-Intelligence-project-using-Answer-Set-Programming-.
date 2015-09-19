@@ -1,0 +1,105 @@
+% Problem Statement - This application is used for allocating seats in a Restaurant in the best possible manner.
+% The goal of this application is to allocate the seats to all the families.
+% Also, this application provides joining (both left and right) of the tables in the same row.
+% So , if individually , seats can not accommodate the family , but joining of seats can accommodate , then the
+% plan will have the respective seats joined.
+
+
+
+%%%% Domain Description
+
+
+capacity(0..10).
+
+% Fluents - 
+
+fluent(assigned(X,Y,C)) :- seat(X,Y,Z) , capacity(C).
+fluent(notSeated(C)) :- guest(C).
+fluent(seatsAssigned).
+
+% Actions -
+
+% every seat can be uniquely identified by X and Y
+% assign(X,Y,C) assigns some seat to the family of C members
+%% assign(X,Y,C) causes assigned(X,Y,C) to be true, and causes assigned(X,Y,0) to be false.
+
+
+action(assign(X,Y,C)) :- seat(X,Y,Z), guest(C),Z>=C.
+
+%X2 is right of X1
+action(joinRight(X1,Y1,X2,Y2)) :- seat(X1,Y1,Z1) , seat(X2,Y2,Z2) , Y2-Y1=1.  
+%X2 is left if S1
+action(joinLeft(X1,Y1,X2,Y2)) :- seat(X1,Y1,Z1) , seat(X2,Y2,Z2) , Y1-Y2=1.
+
+
+
+% Dynamic Causal Laws
+
+ holds(assigned(X,Y,F),S+1) :- occurs(assign(X,Y,F), S),holds(assigned(X,Y,0),S) ,holds(notSeated(F),S) ,seat(X,Y,C), C >=F, step(S).
+
+:- occurs(assign(X,Y,F), S) , -holds(assigned(X,Y,0),S) ,holds(notSeated(F),S) ,seat(X,Y,C),  step(S).
+ 
+-holds(assigned(X,Y,0),S+1):- occurs(assign(X,Y,F), S),holds(assigned(X,Y,0),S) ,holds(notSeated(F),S) ,seat(X,Y,C), C >=F, step(S).
+
+
+-holds(notSeated(F),S+1) :- occurs(assign(X,Y,F), S), step(S).
+
+
+%joining actions 
+ holds(assigned(X1,Y1,F),S+1)  :- occurs(joinRight(X1,Y1,X2,Y2),S),seat(X1,Y1,Z1),seat(X2,Y2,Z2),Y2-Y1=1,holds(notSeated(F),S),step(S),Z1+Z2=F,holds(assigned(X1,Y1,0),S),holds(assigned(X2,Y2,0),S).
+ -holds(assigned(X1,Y1,0),S+1)  :- occurs(joinRight(X1,Y1,X2,Y2),S).
+ 
+ holds(assigned(X2,Y2,F),S+1)  :- occurs(joinRight(X1,Y1,X2,Y2),S),seat(X1,Y1,Z1),seat(X2,Y2,Z2),Y2-Y1=1,holds(notSeated(F),S),step(S),Z1+Z2=F,holds(assigned(X1,Y1,0),S),holds(assigned(X2,Y2,0),S).
+ -holds(assigned(X2,Y2,0),S+1)  :- occurs(joinRight(X1,Y1,X2,Y2),S).
+ 
+-holds(notSeated(F),S+1) :- occurs(joinRight(X1,Y1,X2,Y2), S), step(S),seat(X1,Y1,Z1) , seat(X2,Y2,Z2),Y2-Y1=1,holds(notSeated(F),S),step(S),Z1+Z2=F,holds(assigned(X1,Y1,0),S),holds(assigned(X2,Y2,0),S).
+ 
+ :- occurs(joinRight(X1,Y1,X2,Y2),S),seat(X1,Y1,Z1),seat(X2,Y2,Z2),-holds(assigned(X1,Y1,0),S),step(S).
+ :- occurs(joinRight(X1,Y1,X2,Y2),S),seat(X1,Y1,Z1),seat(X2,Y2,Z2),-holds(assigned(X2,Y2,0),S),step(S).
+ 
+	
+% seatsAssigned - The goal is to make this fluent (seatsAssigned) True
+holds(seatsAssigned,S) :- -holds(notSeated(3),S),-holds(notSeated(7),S),-holds(notSeated(8),S),step(S).
+
+
+
+
+%%%% initial situation, goal, and steps allowed
+
+step(0..3).
+
+% seat X,Y,Capacity
+seat(1,1,2).
+seat(1,2,1).
+seat(1,3,7).
+seat(2,1,9).
+
+
+holds(assigned(1,1,0),0).
+holds(assigned(1,2,0),0).
+holds(assigned(1,3,0),0).
+holds(assigned(2,1,0),0).
+
+holds(notSeated(3),0).
+%holds(notSeated(2),0).
+holds(notSeated(7),0).
+holds(notSeated(8),0).
+
+guest(3).
+%guest(2).
+guest(7).
+guest(8).
+
+
+goal(S) :- holds(seatsAssigned,S), step(S).
+
+%%%% inertia axioms
+
+holds(F,S+1) :- holds(F, S), not -holds(F,S+1), step(S), step(S+1), fluent(F).
+-holds(F,S+1) :- -holds(F, S), not holds(F,S+1), step(S), step(S+1), fluent(F). 
+
+%%%% Basic planner
+
+success :- goal(S), step(S).
+:- not success.
+1{occurs(A,S):action(A)}1 :- not goal(S), step(S).
